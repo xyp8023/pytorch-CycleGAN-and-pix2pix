@@ -1,8 +1,8 @@
 import os.path
 from data.base_dataset import BaseDataset, get_params, get_transform
 from data.image_folder import make_dataset
-from PIL import Image
-
+# from PIL import Image
+import numpy as np
 
 class AlignedDataset(BaseDataset):
     """A dataset class for paired image dataset.
@@ -20,6 +20,7 @@ class AlignedDataset(BaseDataset):
         BaseDataset.__init__(self, opt)
         self.dir_AB = os.path.join(opt.dataroot, opt.phase)  # get the image directory
         self.AB_paths = sorted(make_dataset(self.dir_AB, opt.max_dataset_size))  # get image paths
+#         print("self.AB_paths are: ", self.AB_paths)
         assert(self.opt.load_size >= self.opt.crop_size)   # crop_size should be smaller than the size of loaded image
         self.input_nc = self.opt.output_nc if self.opt.direction == 'BtoA' else self.opt.input_nc
         self.output_nc = self.opt.input_nc if self.opt.direction == 'BtoA' else self.opt.output_nc
@@ -38,20 +39,28 @@ class AlignedDataset(BaseDataset):
         """
         # read a image given a random integer index
         AB_path = self.AB_paths[index]
-        AB = Image.open(AB_path).convert('RGB')
+#         AB = Image.open(AB_path).convert('RGB')
+        AB = np.load(AB_path)
         # split AB image into A and B
-        w, h = AB.size
+        h, w = AB.shape
+#         h, w = AB.size
+        
         w2 = int(w / 2)
-        A = AB.crop((0, 0, w2, h))
-        B = AB.crop((w2, 0, w, h))
+        # N, C, H, W
+#         A = AB.crop((0, 0, w2, h))
+#         B = AB.crop((w2, 0, w, h)) 
+        A = AB[:,:w2] # (h, w2)
+        B = AB[:,w2:]
+        A = A.reshape((1,) + A.shape)
+        B = B.reshape((1,) + B.shape)
 
         # apply the same transform to both A and B
-        transform_params = get_params(self.opt, A.size)
-        A_transform = get_transform(self.opt, transform_params, grayscale=(self.input_nc == 1))
-        B_transform = get_transform(self.opt, transform_params, grayscale=(self.output_nc == 1))
+#         transform_params = get_params(self.opt, A.size)
+#         A_transform = get_transform(self.opt, transform_params, grayscale=(self.input_nc == 1))
+#         B_transform = get_transform(self.opt, transform_params, grayscale=(self.output_nc == 1))
 
-        A = A_transform(A)
-        B = B_transform(B)
+#         A = A_transform(A)
+#         B = B_transform(B)
 
         return {'A': A, 'B': B, 'A_paths': AB_path, 'B_paths': AB_path}
 

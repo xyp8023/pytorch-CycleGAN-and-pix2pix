@@ -207,7 +207,7 @@ def define_D(input_nc, ndf, netD, n_layers_D=3, norm='batch', init_type='normal'
 # Classes
 ##############################################################################
 class TVLoss(nn.Module):
-    def __init__(self,TVLoss_weight=0.1):
+    def __init__(self,TVLoss_weight=1.0):
         super(TVLoss,self).__init__()
         self.TVLoss_weight = TVLoss_weight
 
