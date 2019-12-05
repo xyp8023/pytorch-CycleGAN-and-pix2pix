@@ -5,13 +5,76 @@ import ntpath
 import time
 from . import util, html
 from subprocess import Popen, PIPE
-
+EPS = 1e-12
+depth_max = -9.64964580535888671875 + EPS
+depth_min = -21.6056976318359375 - EPS
 
 if sys.version_info[0] == 2:
     VisdomExceptionBase = Exception
 else:
     VisdomExceptionBase = ConnectionError
 
+    
+def compute_errors(height_ori, height_pre_masked, mask):
+    # mask now: valid data is true
+    d, d_hat = height_ori[mask], height_pre_masked[mask]  # [-1, 1]
+#     d, d_hat = reverse_norm(d), reverse_norm(d_hat)  # [-21, -9]
+
+    thresh = np.maximum((d / d_hat), (d_hat / d))
+    a1 = (thresh < 1.05).mean()
+    a2 = (thresh < 1.05 ** 2).mean()
+    a3 = (thresh < 1.05 ** 3).mean()
+
+    rmse = (d - d_hat) ** 2
+    rmse = np.sqrt(rmse.mean())
+
+    rmse_log10 = (np.log10(-d) - np.log10(-d_hat)) ** 2
+    rmse_log10 = np.sqrt(rmse_log10.mean())
+
+    mae = np.mean(np.abs((d - d_hat)))
+    mae_log10 = np.mean(np.abs(np.log10(-d) - np.log10(-d_hat)))
+
+    abs_rel = np.mean(np.abs(d - d_hat) / -d)
+    sq_rel = np.mean(((d - d_hat) ** 2) / -d)
+
+    return abs_rel, sq_rel, rmse, rmse_log10, mae, mae_log10, a1, a2, a3
+
+def cal_scores(visuals):
+    """ Calculate scores 
+    Parameters:
+        webpage (the HTML class) -- the HTML webpage class that stores these imaegs (see html.py for more details)
+        visuals (OrderedDict)    -- an ordered dictionary that stores (name, images (either tensor or numpy) ) pairs
+        image_path (str)         -- the string is used to create image paths
+    """
+#     image_dir = webpage.get_image_dir()
+#     short_path = ntpath.basename(image_path[0])
+#     name = os.path.splitext(short_path)[0]
+#     txt_name = '%s_%s.txt' % (name, label)
+
+#     webpage.add_header(name)
+#     ims, txts, links = [], [], []
+    for label, im_data in visuals.items():
+#         print('fake_B:')    
+        
+        if "fake_B" in label:
+            im_fake_B = util.tensor2im(im_data, imtype=np.float64, keep_grayscale=True)
+        if "real_B" in label:
+            im_real_B = util.tensor2im(im_data, imtype=np.float64, keep_grayscale=True)
+#     util.print_multi_numpy(im_fake_B, val=True, shp=True)# max 255.0 min 0.0
+    
+#     print('im_fake_B:')    
+#     util.print_numpy(im_fake_B, val=True, shp=True)# max 255.0 min 0.0
+#     print('im_real_B:')    
+#     util.print_numpy(im_real_B, val=True, shp=True)
+    mask = (im_real_B<255.)
+    depth_ori = im_real_B/255.*(depth_max-depth_min)+depth_min
+    depth_pre = im_fake_B/255.*(depth_max-depth_min)+depth_min
+    
+    abs_rel, sq_rel, rmse, rmse_log10, mae, mae_log10, a1, a2, a3 = compute_errors(
+        depth_ori, depth_pre, mask)  # epsilon = 1.05
+#     print("abs_rel, sq_rel, rmse, rmse_log10, mae, mae_log10, a1, a2, a3:\n", abs_rel, sq_rel, rmse, rmse_log10, mae, mae_log10, a1, a2, a3)
+#     print("mae: ", mae)
+    return abs_rel, sq_rel, rmse, rmse_log10, mae, mae_log10, a1, a2, a3
 
 def save_images(webpage, visuals, image_path, aspect_ratio=1.0, width=256):
     """Save images to the disk.
@@ -33,9 +96,15 @@ def save_images(webpage, visuals, image_path, aspect_ratio=1.0, width=256):
     ims, txts, links = [], [], []
 
     for label, im_data in visuals.items():
-        im = util.tensor2im(im_data)
         image_name = '%s_%s.png' % (name, label)
         save_path = os.path.join(image_dir, image_name)
+        if 'B' in label:
+            im = util.tensor2im(im_data, color_map=True)
+#             util.save_image(im, save_path, aspect_ratio=aspect_ratio, color_map=True)
+            
+        else:
+            im = util.tensor2im(im_data)
+        
         util.save_image(im, save_path, aspect_ratio=aspect_ratio)
         ims.append(image_name)
         txts.append(label)
@@ -119,7 +188,12 @@ class Visualizer():
                 images = []
                 idx = 0
                 for label, image in visuals.items():
-                    image_numpy = util.tensor2im(image)
+#                     print('label : ', label)
+                    if 'B' in label:
+                        image_numpy = util.tensor2im(image, color_map=True)    
+                    else:    
+                        image_numpy = util.tensor2im(image)
+                        
                     label_html_row += '<td>%s</td>' % label
                     images.append(image_numpy.transpose([2, 0, 1]))
                     idx += 1
@@ -146,7 +220,13 @@ class Visualizer():
                 idx = 1
                 try:
                     for label, image in visuals.items():
-                        image_numpy = util.tensor2im(image)
+#                         print('label :', label)
+                        
+                        if 'B' in label:
+                            image_numpy = util.tensor2im(image, color_map=True)    
+                        else:    
+                            image_numpy = util.tensor2im(image)
+#                         image_numpy = util.tensor2im(image)
                         self.vis.image(image_numpy.transpose([2, 0, 1]), opts=dict(title=label),
                                        win=self.display_id + idx)
                         idx += 1
@@ -157,7 +237,13 @@ class Visualizer():
             self.saved = True
             # save images to the disk
             for label, image in visuals.items():
-                image_numpy = util.tensor2im(image)
+#                 print('label :', label)
+                
+                if 'B' in label:
+                    image_numpy = util.tensor2im(image, color_map=True)    
+                else:    
+                    image_numpy = util.tensor2im(image)
+#                 image_numpy = util.tensor2im(image)
                 img_path = os.path.join(self.img_dir, 'epoch%.3d_%s.png' % (epoch, label))
                 util.save_image(image_numpy, img_path)
 
@@ -168,7 +254,13 @@ class Visualizer():
                 ims, txts, links = [], [], []
 
                 for label, image_numpy in visuals.items():
-                    image_numpy = util.tensor2im(image)
+#                     print('label :', label)
+                    
+                    if 'B' in label:
+                        image_numpy = util.tensor2im(image, color_map=True)    
+                    else:    
+                        image_numpy = util.tensor2im(image)
+#                     image_numpy = util.tensor2im(image)
                     img_path = 'epoch%.3d_%s.png' % (n, label)
                     ims.append(img_path)
                     txts.append(label)

@@ -31,7 +31,7 @@ class Sss2DepthModel(BaseModel):
         By default, we use L1 loss, ResNet with instance_norm, and aligned datasets.
         """
         # changing the default values to match our case
-        parser.set_defaults(norm='instance', netG='resnet_6blocks', dataset_mode='aligned')
+        parser.set_defaults(norm='instance', netG='resnet_7blocks', dataset_mode='aligned')
         if is_train:
             parser.set_defaults(pool_size=0, gan_mode='none')
             parser.add_argument('--lambda_TV', type=float, default=1e-6, help='weight for tv regularation')
@@ -46,12 +46,12 @@ class Sss2DepthModel(BaseModel):
         """
         BaseModel.__init__(self, opt)
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
-        self.loss_names = ['TV',  'G_L1_show']
+        self.loss_names = ['TV',  'G_L1']
 #         self.loss_names = ['TV', 'G_L1']
         
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
 #         self.visual_names = ['real_A', 'fake_B', 'real_B', 'mask']
-        self.visual_names = ['real_A', 'real_B', 'fake_B_show']
+        self.visual_names = ['real_A', 'real_B', 'fake_B_show', 'fake_B']
         
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>
 
@@ -82,26 +82,26 @@ class Sss2DepthModel(BaseModel):
         self.real_A = input['A' if AtoB else 'B'].to(self.device)
         self.real_B = input['B' if AtoB else 'A'].to(self.device)
         self.image_paths = input['A_paths' if AtoB else 'B_paths']
-        self.mask = (self.real_B<1.0)
+        self.mask = (self.real_B<1.0) # type bool
         
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
-#         self.fake_B = self.netG(self.real_A)* (self.mask.float())  # G(A)
-        self.fake_B_show = self.netG(self.real_A)* (self.mask.float())
+        self.fake_B = self.netG(self.real_A) 
+        self.fake_B_show = self.fake_B * (self.mask.float())
         self.fake_B_show[~self.mask]=1.0
 
     def backward_G(self):
         """Calculate TV and L1 loss for the generator"""
 
         # Second, G(A) = B
-        self.loss_CNT = self.mask.size()[0]*self.mask.size()[2]*self.mask.size()[3]/torch.sum(self.mask.float())
+#         self.loss_CNT = self.mask.size()[0]*self.mask.size()[2]*self.mask.size()[3]/torch.sum(self.mask.float())
         
-#         self.loss_G_L1 = self.criterionL1(self.fake_B , self.real_B * self.mask.float()) * 2.0 *(depth_max-depth_min) * self.loss_CNT
-        self.loss_G_L1_show = self.criterionL1(self.fake_B_show , self.real_B) * 2.0 *(depth_max-depth_min) * self.loss_CNT
+        self.loss_G_L1 = self.criterionL1(self.fake_B_show, self.real_B) * 2.0 *(depth_max-depth_min)
+#         self.loss_G_L1_show = self.criterionL1(self.fake_B_show , self.real_B) * 2.0 *(depth_max-depth_min) * self.loss_CNT
         
-        self.loss_TV = self.criterionTV(self.fake_B_show) * self.loss_CNT 
+        self.loss_TV = self.criterionTV(self.fake_B) 
         # combine loss and calculate gradients
-        self.loss_G = self.loss_TV + self.loss_G_L1_show
+        self.loss_G = self.loss_TV + self.loss_G_L1
         self.loss_G.backward()
 
     def optimize_parameters(self):

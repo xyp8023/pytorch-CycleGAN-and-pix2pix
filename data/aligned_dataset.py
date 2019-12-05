@@ -46,11 +46,13 @@ class AlignedDataset(BaseDataset):
 #         h, w = AB.size
         
         w2 = int(w / 2)
+        h2 = int(h / 2)
+        
         # N, C, H, W
 #         A = AB.crop((0, 0, w2, h))
 #         B = AB.crop((w2, 0, w, h)) 
-        A = AB[:,:w2] # (h, w2)
-        B = AB[:,w2:]
+        A = AB[:h2,:w2] # (h, w2)
+        B = AB[:h2,w2:]
         A = A.reshape((1,) + A.shape)
         B = B.reshape((1,) + B.shape)
 
