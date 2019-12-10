@@ -46,7 +46,7 @@ class AlignedDataset(BaseDataset):
 #         h, w = AB.size
         
         w2 = int(w / 2)
-        h2 = int(h / 2)
+        h2 = int(h / 4)
         
         # N, C, H, W
 #         A = AB.crop((0, 0, w2, h))
