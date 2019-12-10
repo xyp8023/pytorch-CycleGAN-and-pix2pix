@@ -25,10 +25,10 @@ echo "Starting job ${SLURM_JOB_ID} on ${SLURMD_NODENAME}"
 
 conda activate pytorch-py3
 
-python -m visdom.server --hostname=khazadum.csc.kth.se -port=${PORT} & 
+python -m visdom.server --hostname=${SLURMD_NODENAME}.csc.kth.se -port=${PORT} & 
 
 python train_sss2depth_m2m.py --dataroot=/local_storage/datasets/yipingx/prune_unfilled_norm_sep_256x256 --name=sss2depth_lr_${LR}_tv_${TV} --model=sss2depth --direction=AtoB \
---niter=${NITER} --niter_decay=500 --batch_size=32 --preprocess=none --input_nc=1 --output_nc=1 --num_threads=8 --display_server=khazadum.csc.kth.se \
+--niter=${NITER} --niter_decay=500 --batch_size=32 --preprocess=none --input_nc=1 --output_nc=1 --num_threads=8 --display_server=${SLURMD_NODENAME}.csc.kth.se \
 --display_port=${PORT} --max_dataset_size=100000 --display_id=1 --display_freq=100 --print_freq=100 --save_epoch_freq=50 --lambda_TV=${TV} --load_size=256 \
 --no_dropout --no_flip --beta1=0.9 --ngf=32 --netG=resnet_7blocks --lr=${LR}
 
