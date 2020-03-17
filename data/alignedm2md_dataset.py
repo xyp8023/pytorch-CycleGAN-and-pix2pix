@@ -59,9 +59,15 @@ class AlignedM2MDDataset(BaseDataset):
         
         # for sssd2depth
         sss = AB[:,:h]
-        depth = AB[:,h:2*h]
-        sparse_depth = AB[:, 2*h:3*h]
-        sparse_depth = np.expand_dims(sparse_depth, axis=0) # (1, 256, 256)
+        cos = AB[:,h:2*h]
+        sparse_cos = AB[:, 2*h:3*h]
+
+        slant = AB[:, 3*h:4*h]
+        depth = AB[:, 4*h:5*h]
+
+        sparse_cos = np.expand_dims(sparse_cos, axis=0) # (1, 256, 256)
+        slant = np.expand_dims(slant, axis=0) # (1, 256, 256)
+        depth = np.expand_dims(depth, axis=0) # (1, 256, 256)
 
         """
         # sample sparse_depth
@@ -78,8 +84,8 @@ class AlignedM2MDDataset(BaseDataset):
         # print("sss shape: ", sss.shape)
         # print("sparse depth shape: ", sparse_depth.shape)
 
-        sss_sparse_depth = np.append(sss, sparse_depth, axis=0)
-        depth = depth.reshape((1,) + depth.shape)
+        sss_sparse_cos = np.append(sss, sparse_cos, axis=0)
+        cos = cos.reshape((1,) + cos.shape)
         
 
         # apply the same transform to both A and B
@@ -90,7 +96,7 @@ class AlignedM2MDDataset(BaseDataset):
 #         A = A_transform(A)
 #         B = B_transform(B)
 
-        return {'A': sss_sparse_depth, 'B': depth, 'A_paths': AB_path, 'B_paths': AB_path}
+        return {'A': sss_sparse_cos, 'B': cos, 'A_paths': AB_path, 'B_paths': AB_path, 'slant': slant, 'depth': depth}
 
     def __len__(self):
         """Return the total number of images in the dataset."""

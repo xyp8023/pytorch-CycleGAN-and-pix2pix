@@ -154,6 +154,8 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
         net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=7)
     elif netG == 'resnet_7blocks_m2o':
         net = ResnetGeneratorM2O(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=7)
+    elif netG == 'resnet_7blocks_pnp':
+        net = ResnetGeneratorPnP(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=7)
     elif netG == 'unet_128':
         net = UnetGenerator(input_nc, output_nc, 7, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
     elif netG == 'unet_256':
@@ -470,7 +472,80 @@ class ResnetGeneratorM2O(nn.Module):
         
         return output_1.view(N,C,1,W)
 
+
+class ResnetGeneratorPnP(nn.Module):
+    """Resnet-based generator that consists of Resnet blocks between a few downsampling/upsampling operations.
+
+    We adapt Torch code and idea from Justin Johnson's neural style transfer project(https://github.com/jcjohnson/fast-neural-style)
+    """
+
+    def __init__(self, input_nc, output_nc, ngf=64, norm_layer=nn.BatchNorm2d, use_dropout=False, n_blocks=6, padding_type='reflect'):
+        """Construct a Resnet-based generator
+
+        Parameters:
+            input_nc (int)      -- the number of channels in input images
+            output_nc (int)     -- the number of channels in output images
+            ngf (int)           -- the number of filters in the last conv layer
+            norm_layer          -- normalization layer
+            use_dropout (bool)  -- if use dropout layers
+            n_blocks (int)      -- the number of ResNet blocks
+            padding_type (str)  -- the name of padding layer in conv layers: reflect | replicate | zero
+        """
+        assert(n_blocks >= 0)
+        super(ResnetGeneratorPnP, self).__init__()
+        if type(norm_layer) == functools.partial:
+            use_bias = norm_layer.func == nn.InstanceNorm2d
+        else:
+            use_bias = norm_layer == nn.InstanceNorm2d
+
+        model = [nn.ReflectionPad2d(3),
+                 nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
+                 norm_layer(ngf),
+                 nn.ReLU(True)]
+
+        n_downsampling = 2
+        for i in range(n_downsampling):  # add downsampling layers
+            mult = 2 ** i
+            model += [nn.Conv2d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=1, bias=use_bias),
+                      norm_layer(ngf * mult * 2),
+                      nn.ReLU(True)]
+
+        mult = 2 ** n_downsampling
+        for i in range(n_blocks):       # add ResNet blocks
+
+            model += [ResnetBlock(ngf * mult, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias)]
+        self.pnp_front = nn.Sequential(*model)
+
+        model = []
+        for i in range(n_downsampling):  # add upsampling layers
+            mult = 2 ** (n_downsampling - i)
+            model += [nn.ConvTranspose2d(ngf * mult, int(ngf * mult / 2),
+                                         kernel_size=3, stride=2,
+                                         padding=1, output_padding=1,
+                                         bias=use_bias),
+                      norm_layer(int(ngf * mult / 2)),
+                      nn.ReLU(True)]
+        model += [nn.ReflectionPad2d(3)]
+        model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=0)]
+        model += [nn.Tanh()]
+
+        # self.model = nn.Sequential(*model)
+        self.pnp_rear = nn.Sequential(*model)
+
+
+    def forward(self, input):
+        """Standard forward"""
+        # return self.model(input)
+        return self.pnp_rear(self.pnp_front(input))
+
+    def forward_pnp_front(self, input):
+        """pnp front forward"""
+        return self.pnp_front(input)
     
+    def forward_pnp_rear(self, input):
+        """pnp rear forward"""
+        return self.pnp_rear(input)
+
 class ResnetBlock(nn.Module):
     """Define a Resnet block"""
 

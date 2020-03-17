@@ -23,7 +23,7 @@ from options.train_options import TrainOptions
 from options.val_options import ValOptions
 from data import create_dataset
 from models import create_model
-from util.visualizer_m2o import Visualizer, save_images, cal_scores
+from util.visualizer_sssd import Visualizer, save_images, cal_scores
 from copy import deepcopy
 import os
 from util import html
@@ -31,10 +31,11 @@ from util import html
 
 if __name__ == '__main__':
     opt = TrainOptions().parse()   # get training options
+    # opt.sample_nums = 100
+    # opt.dataset_mode = "alignedm2md"
     dataset = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options
     dataset_size = len(dataset)    # get the number of images in the dataset.
     print('The number of training images = %d' % dataset_size)
-    print("gpu id: ", opt.gpu_ids)
 
     model = create_model(opt)      # create a model given opt.model and other options
     model.setup(opt)               # regular setup: load and print networks; create schedulers
@@ -53,6 +54,8 @@ if __name__ == '__main__':
     opt_val.isTrain = False        # get validating options
     opt_val.results_dir= './results/'
     opt_val.aspect_ratio = 1.0
+    # opt_val.sample_nums = 100
+    # opt_val.dataset_mode = "alignedm2md"
     
     dataset_val = create_dataset(opt_val)
 #     opt_val.print_options(opt_val)
@@ -81,7 +84,6 @@ if __name__ == '__main__':
                 save_result = total_iters % opt.update_html_freq == 0
                 model.compute_visuals()
                 visualizer.display_current_results(model.get_current_visuals(), epoch, save_result)
-                # visualizer.plot_current_results(model.get_current_visuals(), opt.batch_size, save_result)
 
             if total_iters % opt.print_freq == 0:    # print training losses and save logging information to the disk
                 losses = model.get_current_losses()

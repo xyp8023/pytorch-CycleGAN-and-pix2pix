@@ -8,7 +8,8 @@ from subprocess import Popen, PIPE
 EPS = 1e-12
 depth_max = -9.64964580535888671875 + EPS
 depth_min = -21.6056976318359375 - EPS
-
+# depth_max = -32.58413 + EPS
+# depth_min = -100.83445 + EPS
 if sys.version_info[0] == 2:
     VisdomExceptionBase = Exception
 else:
@@ -193,6 +194,8 @@ class Visualizer():
                         image_numpy = util.tensor2im(image, color_map=True)    
                     else:    
                         image_numpy = util.tensor2im(image)
+                        print("label, image numpy shape: ", label, image_numpy.shape)
+
                         
                     label_html_row += '<td>%s</td>' % label
                     images.append(image_numpy.transpose([2, 0, 1]))

@@ -5,10 +5,14 @@ import ntpath
 import time
 from . import util, html
 from subprocess import Popen, PIPE
-EPS = 1e-12
-depth_max = -9.64964580535888671875 + EPS
-depth_min = -21.6056976318359375 - EPS
-
+# EPS = 1e-12
+# depth_max = -9.64964580535888671875 + EPS
+# depth_min = -21.6056976318359375 - EPS
+EPS = 1e-6
+depth_max = -9.636662 + EPS
+depth_min = -21.605515 - EPS
+# depth_max = -32.58413 + EPS
+# depth_min = -100.83445 + EPS
 if sys.version_info[0] == 2:
     VisdomExceptionBase = Exception
 else:

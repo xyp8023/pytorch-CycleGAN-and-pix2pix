@@ -39,6 +39,7 @@ class BaseModel(ABC):
         self.loss_names = []
         self.model_names = []
         self.visual_names = []
+        self.visual_names_test = []
         self.optimizers = []
         self.image_paths = []
         self.metric = 0  # used for learning rate policy 'plateau'
@@ -97,7 +98,29 @@ class BaseModel(ABC):
             if isinstance(name, str):
                 net = getattr(self, 'net' + name)
                 net.eval()
+    
+    @abstractmethod
+    def forward_pnp_front(self):
+        pass
 
+    @abstractmethod
+    def forward_pnp_rear(self):
+        pass
+
+    def optimize_parameters_pnp(self):
+        """Calculate losses, gradients, and update network weights; called in every training iteration"""
+        pass
+
+    def val_pnp(self):
+        
+        self.optimize_parameters_pnp()
+        # for name in self.model_names:
+        #     if isinstance(name, str):
+        #         net = getattr(self, 'net' + name)
+        #         # net.eval()
+        #         print(type(net))
+        #         net.optimize_parameters_pnp()
+    
     def test(self):
         """Forward function used in test time.
 
@@ -131,6 +154,14 @@ class BaseModel(ABC):
         """Return visualization images. train.py will display these images with visdom, and save the images to a HTML"""
         visual_ret = OrderedDict()
         for name in self.visual_names:
+            if isinstance(name, str):
+                visual_ret[name] = getattr(self, name)
+        return visual_ret
+
+    def get_current_visuals_test(self):
+        """Return visualization images. train.py will display these images with visdom, and save the images to a HTML"""
+        visual_ret = OrderedDict()
+        for name in self.visual_names_test:
             if isinstance(name, str):
                 visual_ret[name] = getattr(self, name)
         return visual_ret

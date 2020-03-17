@@ -54,6 +54,9 @@ class BaseOptions():
         parser.add_argument('--load_iter', type=int, default='0', help='which iteration to load? if load_iter > 0, the code will load models by iter_[load_iter]; otherwise, the code will load models by [epoch]')
         parser.add_argument('--verbose', action='store_true', help='if specified, print more debugging information')
         parser.add_argument('--suffix', default='', type=str, help='customized suffix: opt.name = opt.name + suffix: e.g., {model}_{netG}_size{load_size}')
+        parser.add_argument('--sample_nums', default=0, type=int, help='sample number for sparse depth')
+        parser.add_argument('--is_pnp', default=False, type=bool, help='if to use plug-and-play during validation and test')
+
         self.initialized = True
         return parser
 

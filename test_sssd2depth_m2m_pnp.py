@@ -30,11 +30,9 @@ import os
 from options.test_options import TestOptions
 from data import create_dataset
 from models import create_model
-from util.visualizer_m2o import save_images, cal_scores, plot_images
+from util.visualizer_sssd import save_images, cal_scores
 from util import html
-import numpy as np
-import ntpath
-import math
+import time
 
 
 if __name__ == '__main__':
@@ -65,52 +63,21 @@ if __name__ == '__main__':
     if opt.eval:
         model.eval()
     abs_rel, sq_rel, rmse, rmse_log10, mae, mae_log10, a1, a2, a3 = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
-    print(len(dataset))
-    num_rows = int(len(dataset)/2)
-    waterfall_depth_stbd = {"real_B": -10*np.ones(shape=(num_rows,256)) , "fake_B": -10*np.ones(shape=(num_rows,256)), "fake_B_show": -10*np.ones(shape=(num_rows,256))}
-    waterfall_depth_port = {"real_B": -10*np.ones(shape=(num_rows,256)) , "fake_B": -10*np.ones(shape=(num_rows,256)), "fake_B_show": -10*np.ones(shape=(num_rows,256))}
-    # waterfall_depth_stbd = {x: [] for x in ["real_B", "fake_B", "fake_B_show"]}
-    # waterfall_depth_port = {x: [] for x in ["real_B", "fake_B", "fake_B_show"]}
-
+    t_comp_total=0.0
     for i, data in enumerate(dataset):
         if i >= opt.num_test:  # only apply our model to opt.num_test images.
             break
         model.set_input(data)  # unpack data from data loader
-        model.test()           # run inference
+        # model.test()           # run inference
+        start_time = time.time()
+        model.val_pnp()
+        t_comp_total += (time.time()-start_time)
+        # model.optimize_parameters_pnp()
         visuals = model.get_current_visuals()  # get image results
         img_path = model.get_image_paths()     # get image paths
 #         if i % 5 == 0:  # save images to an HTML file
-#         print('processing (%04d)-th image... %s' % (i, img_path))
-        save_images(webpage, visuals, img_path)
-        plot_images(webpage, visuals, img_path)
-        # # save waterfall image
-        # for label, image in visuals.items():
-        #     if label in waterfall_depth_stbd.keys():
-        #         short_path = int(ntpath.basename(img_path[0]).rstrip('.npy'))
-        #         short_path_half = math.floor(short_path/2.0)
-        #         # short_path = math.floor(int(ntpath.basename(img_path[0]).rstrip('.npy'))/2.0)
-        #         # if i<10 and label=="real_B":
-        #             # print("short_path", math.floor(int(short_path)/2.0))
-                
-        #         # print("image.shape", image.cpu().detach().numpy().reshape(256,).shape)
-        #         image =image.cpu().detach().numpy().reshape(256,) # (-1,1)
-        #         # print("image.type", type(image))
-        #         # print("image.max", image.max())
-        #         # print("image.min", image.min())
-
-        #         # print("waterfall_depth[0].shape", waterfall_depth[label][0].shape)
-        #         if short_path%2 ==1:
-        #             waterfall_depth_port[label][short_path_half] = image
-        #         else:
-        #             waterfall_depth_stbd[label][short_path_half] = image
-
-        # if i==0:
-            # waterfall_depth = {""}
-        # if i==opt.num_test=1:
-            # plot_waterfall(webpage, visuals, image_path, labels=["real_B", "fake_B", "fake_B_show"], append=False):
-        # else:
-            # plot_waterfall(webpage, visuals, image_path, labels=["real_B", "fake_B", "fake_B_show"], append=True):
-            
+        print('processing (%04d)-th image... %s' % (i, img_path))
+        save_images(webpage, visuals, img_path, aspect_ratio=opt.aspect_ratio, width=opt.display_winsize)
         (abs_rel_, sq_rel_, rmse_, rmse_log10_, mae_, mae_log10_, a1_, a2_, a3_) = cal_scores(visuals)
     
         abs_rel += abs_rel_
@@ -124,13 +91,9 @@ if __name__ == '__main__':
         a3 += a3_
     print('saving the model at the end of epoch: ' , opt.epoch)
     print('i+1 is: ', i)
+    # print('average time is 't_comp_total/(i+1))
 #             (abs_rel, sq_rel, rmse, rmse_log10, mae, mae_log10, a1, a2, a3)=(abs_rel, sq_rel, rmse, rmse_log10, mae, mae_log10, a1, a2, a3)/(i_val+1)
     webpage.save()  # save the HTML
-    # image_dir = webpage.get_image_dir()
-    # print(image_dir)
-    np.save(os.path.join(webpage.get_image_dir(), "waterfall_depth_port.npy"), waterfall_depth_port)
-    np.save(os.path.join(webpage.get_image_dir(), "waterfall_depth_stbd.npy"), waterfall_depth_stbd)
-
     abs_rel /= (i+1)
     sq_rel /= (i+1)
     rmse /= (i+1)
@@ -140,7 +103,7 @@ if __name__ == '__main__':
     a1 /= (i+1)
     a2 /= (i+1)
     a3 /= (i+1)
-    losses = {"abs_rel": abs_rel, "sq_rel":sq_rel, "rmse": rmse, "rmse_log10":rmse_log10, "mae":mae, "mae_log10":mae_log10, "a1":a1, "a2":a2, "a3":a3}
+    losses = {"pnp":opt.pnp_iters, "average_time": t_comp_total/(i+1), "abs_rel": abs_rel, "sq_rel":sq_rel, "rmse": rmse, "rmse_log10":rmse_log10, "mae":mae, "mae_log10":mae_log10, "a1":a1, "a2":a2, "a3":a3}
     message = '(test phase) '
     for k, v in losses.items():
         message += '%s: %.3f ' % (k, v)

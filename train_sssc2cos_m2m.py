@@ -23,7 +23,7 @@ from options.train_options import TrainOptions
 from options.val_options import ValOptions
 from data import create_dataset
 from models import create_model
-from util.visualizer_m2o import Visualizer, save_images, cal_scores
+from util.visualizer_sssc import Visualizer, save_images, cal_scores, cal_scores_test
 from copy import deepcopy
 import os
 from util import html
@@ -31,10 +31,11 @@ from util import html
 
 if __name__ == '__main__':
     opt = TrainOptions().parse()   # get training options
+    # opt.sample_nums = 100
+    # opt.dataset_mode = "alignedm2md"
     dataset = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options
     dataset_size = len(dataset)    # get the number of images in the dataset.
     print('The number of training images = %d' % dataset_size)
-    print("gpu id: ", opt.gpu_ids)
 
     model = create_model(opt)      # create a model given opt.model and other options
     model.setup(opt)               # regular setup: load and print networks; create schedulers
@@ -53,6 +54,8 @@ if __name__ == '__main__':
     opt_val.isTrain = False        # get validating options
     opt_val.results_dir= './results/'
     opt_val.aspect_ratio = 1.0
+    # opt_val.sample_nums = 100
+    # opt_val.dataset_mode = "alignedm2md"
     
     dataset_val = create_dataset(opt_val)
 #     opt_val.print_options(opt_val)
@@ -81,7 +84,6 @@ if __name__ == '__main__':
                 save_result = total_iters % opt.update_html_freq == 0
                 model.compute_visuals()
                 visualizer.display_current_results(model.get_current_visuals(), epoch, save_result)
-                # visualizer.plot_current_results(model.get_current_visuals(), opt.batch_size, save_result)
 
             if total_iters % opt.print_freq == 0:    # print training losses and save logging information to the disk
                 losses = model.get_current_losses()
@@ -101,10 +103,10 @@ if __name__ == '__main__':
             for i_val, data_val in enumerate(dataset_val):
                 model.set_input(data_val)
                 model.test()           # run inference
-                visuals = model.get_current_visuals()  # get image results
+                visuals = model.get_current_visuals_test()  # get image results
                 img_path = model.get_image_paths()     # get image paths
 #                 save_images(webpage_val, visuals, img_path, aspect_ratio=opt_val.aspect_ratio, width=opt.display_winsize)
-                (abs_rel_, sq_rel_, rmse_, rmse_log10_, mae_, mae_log10_, a1_, a2_, a3_) = cal_scores(visuals)
+                (abs_rel_, sq_rel_, rmse_, rmse_log10_, mae_, mae_log10_, a1_, a2_, a3_) = cal_scores_test(visuals)
     
                 abs_rel += abs_rel_
                 sq_rel += sq_rel

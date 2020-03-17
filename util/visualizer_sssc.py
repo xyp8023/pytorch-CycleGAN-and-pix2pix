@@ -5,11 +5,6 @@ import ntpath
 import time
 from . import util, html
 from subprocess import Popen, PIPE
-EPS = 1e-12
-depth_max = -9.64964580535888671875 + EPS
-depth_min = -21.6056976318359375 - EPS
-# depth_max = -32.58413 + EPS
-# depth_min = -100.83445 + EPS
 
 
 if sys.version_info[0] == 2:
@@ -21,7 +16,6 @@ else:
 def compute_errors(height_ori, height_pre_masked, mask):
     # mask now: valid data is true
     d, d_hat = height_ori[mask], height_pre_masked[mask]  # [-1, 1]
-#     d, d_hat = reverse_norm(d), reverse_norm(d_hat)  # [-21, -9]
 
     thresh = np.maximum((d / d_hat), (d_hat / d))
     a1 = (thresh < 1.05).mean()
@@ -59,9 +53,9 @@ def cal_scores(visuals):
     for label, im_data in visuals.items():
 #         print('fake_B:')    
         
-        if "fake_B" in label:
+        if "fake_B" == label:
             im_fake_B = util.tensor2im(im_data, imtype=np.float64, keep_grayscale=True)
-        if "real_B" in label:
+        if "real_B" == label:
             im_real_B = util.tensor2im(im_data, imtype=np.float64, keep_grayscale=True)
 #     util.print_multi_numpy(im_fake_B, val=True, shp=True)# max 255.0 min 0.0
     
@@ -69,9 +63,9 @@ def cal_scores(visuals):
 #     util.print_numpy(im_fake_B, val=True, shp=True)# max 255.0 min 0.0
 #     print('im_real_B:')    
 #     util.print_numpy(im_real_B, val=True, shp=True)
-    mask = (im_real_B<255.)
-    depth_ori = im_real_B/255.*(depth_max-depth_min)+depth_min
-    depth_pre = im_fake_B/255.*(depth_max-depth_min)+depth_min
+    mask = (im_real_B>0.)
+    depth_ori = im_real_B/255.
+    depth_pre = im_fake_B/255.
     
     abs_rel, sq_rel, rmse, rmse_log10, mae, mae_log10, a1, a2, a3 = compute_errors(
         depth_ori, depth_pre, mask)  # epsilon = 1.05
@@ -79,65 +73,8 @@ def cal_scores(visuals):
 #     print("mae: ", mae)
     return abs_rel, sq_rel, rmse, rmse_log10, mae, mae_log10, a1, a2, a3
 
-def plot_waterfall(webpage, visuals, image_path, labels, append=True):
-    """plot depth in waterfall display and save to the disk.
-
-    Parameters:
-        webpage (the HTML class) -- the HTML webpage class that stores these imaegs (see html.py for more details)
-        visuals (OrderedDict)    -- an ordered dictionary that stores (name, images (either tensor or numpy) ) pairs
-        image_path (str)         -- the string is used to create image paths
-
-    This function will plot depth in water fall display and save plots stored in 'visuals' to the HTML file specified by 'webpage'.
-    """
-    import matplotlib.pyplot as plt
-    image_dir = webpage.get_image_dir()
-    short_path = ntpath.basename(image_path[0])
-    name = os.path.splitext(short_path)[0]
-    image_name = 'plot_waterfall.png' % (name)
-    save_path = os.path.join(image_dir, image_name)
-
-    im_waterfall = {x: [] for x in labels}
-    for label, im_data in visuals.items():
-        if 'B' in label:
-            im = util.tensor2im(im_data, imtype=np.float64, color_map=False, keep_grayscale=True)
-            im_waterfall[label].append(im)
-            # im = im/255.*(depth_max-depth_min)+depth_min
-            # plt.plot(im.reshape(-1,), label=label)
-        else:
-            pass
-
-def plot_images(webpage, visuals, image_path):
-    """plot depth and save to the disk.
-
-    Parameters:
-        webpage (the HTML class) -- the HTML webpage class that stores these imaegs (see html.py for more details)
-        visuals (OrderedDict)    -- an ordered dictionary that stores (name, images (either tensor or numpy) ) pairs
-        image_path (str)         -- the string is used to create image paths
-
-    This function will plot depth and save plots stored in 'visuals' to the HTML file specified by 'webpage'.
-    """
-    import matplotlib.pyplot as plt
-    image_dir = webpage.get_image_dir()
-    short_path = ntpath.basename(image_path[0])
-    name = os.path.splitext(short_path)[0]
-    image_name = 'plot_%s.png' % (name)
-    save_path = os.path.join(image_dir, image_name)
-
-    for label, im_data in visuals.items():
-        if 'B' in label:
-
-            im = util.tensor2im(im_data, imtype=np.float64, color_map=False, keep_grayscale=True)/255.*(depth_max-depth_min)+depth_min
-            plt.plot(im.reshape(-1,), label=label)
-            plt.ylim([im.min()-0.5, im.min()+2])
-            plt.grid(True)
-        else:
-            pass
-    plt.legend()
-    plt.savefig(save_path)
-    plt.clf()
-
-def save_images(webpage, visuals, image_path):
-    """Save numpy arrary to the disk.
+def save_images(webpage, visuals, image_path, aspect_ratio=1.0, width=256):
+    """Save images to the disk.
 
     Parameters:
         webpage (the HTML class) -- the HTML webpage class that stores these imaegs (see html.py for more details)
@@ -151,30 +88,134 @@ def save_images(webpage, visuals, image_path):
     image_dir = webpage.get_image_dir()
     short_path = ntpath.basename(image_path[0])
     name = os.path.splitext(short_path)[0]
-    print(short_path)
-    # webpage.add_header(name)
-    # ims, txts, links = [], [], []
+
+    webpage.add_header(name)
+    ims, txts, links = [], [], []
 
     for label, im_data in visuals.items():
-        image_name = '%s_%s.npy' % (name, label)
-        # image_name = '%s_%s.png' % (name, label)
-
+        image_name = '%s_%s.png' % (name, label)
         save_path = os.path.join(image_dir, image_name)
         if 'B' in label:
-            # im = util.tensor2im(im_data, imtype=np.float64, color_map=True)
-            im = util.tensor2im(im_data, imtype=np.float64, color_map=False)
-
+            im = util.tensor2im(im_data, color_map=True)
 #             util.save_image(im, save_path, aspect_ratio=aspect_ratio, color_map=True)
             
-        # else:
-            # im = util.tensor2im(im_data, imtype=np.float64)
+        else:
+            # im = util.tensor2im(im_data)
+            im = util.tensor2im(im_data[:,0,:,:].unsqueeze(1))
+            im_numpy_sparse = util.tensor2im(im_data[:,1,:,:].unsqueeze(1), color_map=True)
         
-            # util.save_image(im, save_path, aspect_ratio=aspect_ratio)
-            util.save_numpy_array(im, save_path)
-            # ims.append(image_name)
-            # txts.append(label)
-            # links.append(image_name)
-    # webpage.add_images(ims, txts, links, width=width)
+        util.save_image(im, save_path, aspect_ratio=aspect_ratio)
+        if 'A' in label:
+            util.save_image(im_numpy_sparse, os.path.join(image_dir, 'sparse_'+image_name), aspect_ratio=aspect_ratio)
+        ims.append(image_name)
+        if 'A' in label:
+            ims.append('sparse_'+image_name)
+        txts.append(label)
+        if 'A' in label:
+            txts.append('sparse_'+label)
+        links.append(image_name)
+        if 'A' in label:
+            links.append('sparse_'+image_name)
+
+    webpage.add_images(ims, txts, links, width=width)
+
+
+
+def cal_scores_test(visuals):
+    """ Calculate scores 
+    Parameters:
+        webpage (the HTML class) -- the HTML webpage class that stores these imaegs (see html.py for more details)
+        visuals (OrderedDict)    -- an ordered dictionary that stores (name, images (either tensor or numpy) ) pairs
+        image_path (str)         -- the string is used to create image paths
+    """
+#     image_dir = webpage.get_image_dir()
+#     short_path = ntpath.basename(image_path[0])
+#     name = os.path.splitext(short_path)[0]
+#     txt_name = '%s_%s.txt' % (name, label)
+
+#     webpage.add_header(name)
+#     ims, txts, links = [], [], []
+    for label, im_data in visuals.items():
+#         print('fake_B:')    
+        
+        if "fake_B" == label:
+            im_fake_B = util.tensor2im(im_data, imtype=np.float64, keep_grayscale=True)
+        if "real_B" == label:
+            im_real_B = util.tensor2im(im_data, imtype=np.float64, keep_grayscale=True)
+        if "real_slant" == label:
+            im_slant = util.tensor2im_raw(im_data, imtype=np.float64)
+        if "real_depth" == label:
+            depth_ori = util.tensor2im_raw(im_data, imtype=np.float64)
+#     util.print_multi_numpy(im_fake_B, val=True, shp=True)# max 255.0 min 0.0
+    
+#     print('im_fake_B:')    
+#     util.print_numpy(im_fake_B, val=True, shp=True)# max 255.0 min 0.0
+#     print('im_real_B:')    
+#     util.print_numpy(im_real_B, val=True, shp=True)
+    mask = (im_real_B>0.)  # valid mask
+    mask_depth = depth_ori!=0. # valid mask 
+
+    cos_ori = im_real_B/255. # (0,1)
+    cos_pre = (im_fake_B/255.).reshape((256,256))
+    # print("im_slant shape: ", im_slant.shape)
+    # print("cos_pre shape: ", cos_pre.shape)
+    # print("depth_ori shape: ", depth_ori.shape)
+
+    depth_pre = -cos_pre*im_slant # positive to negativate 
+    depth_pre[~mask_depth]=0.
+    # depth_ori
+    abs_rel, sq_rel, rmse, rmse_log10, mae, mae_log10, a1, a2, a3 = compute_errors(
+        depth_ori, depth_pre, mask_depth)  # epsilon = 1.05
+#     print("abs_rel, sq_rel, rmse, rmse_log10, mae, mae_log10, a1, a2, a3:\n", abs_rel, sq_rel, rmse, rmse_log10, mae, mae_log10, a1, a2, a3)
+#     print("mae: ", mae)
+    return abs_rel, sq_rel, rmse, rmse_log10, mae, mae_log10, a1, a2, a3
+
+def save_images_test(webpage, visuals, image_path, aspect_ratio=1.0, width=256):
+    """Save images to the disk.
+
+    Parameters:
+        webpage (the HTML class) -- the HTML webpage class that stores these imaegs (see html.py for more details)
+        visuals (OrderedDict)    -- an ordered dictionary that stores (name, images (either tensor or numpy) ) pairs
+        image_path (str)         -- the string is used to create image paths
+        aspect_ratio (float)     -- the aspect ratio of saved images
+        width (int)              -- the images will be resized to width x width
+
+    This function will save images stored in 'visuals' to the HTML file specified by 'webpage'.
+    """
+    image_dir = webpage.get_image_dir()
+    short_path = ntpath.basename(image_path[0])
+    name = os.path.splitext(short_path)[0]
+
+    webpage.add_header(name)
+    ims, txts, links = [], [], []
+
+    for label, im_data in visuals.items():
+        image_name = '%s_%s.png' % (name, label)
+        save_path = os.path.join(image_dir, image_name)
+        if 'B' in label:
+            im = util.tensor2im(im_data, color_map=True)
+#             util.save_image(im, save_path, aspect_ratio=aspect_ratio, color_map=True)
+            
+        elif 'A' in label:
+            # im = util.tensor2im(im_data)
+            im = util.tensor2im(im_data[:,0,:,:].unsqueeze(1))
+            im_numpy_sparse = util.tensor2im(im_data[:,1,:,:].unsqueeze(1), color_map=True)
+        
+        util.save_image(im, save_path, aspect_ratio=aspect_ratio)
+        if 'A' in label:
+            util.save_image(im_numpy_sparse, os.path.join(image_dir, 'sparse_'+image_name), aspect_ratio=aspect_ratio)
+        ims.append(image_name)
+        if 'A' in label:
+            ims.append('sparse_'+image_name)
+        txts.append(label)
+        if 'A' in label:
+            txts.append('sparse_'+label)
+        links.append(image_name)
+        if 'A' in label:
+            links.append('sparse_'+image_name)
+
+    webpage.add_images(ims, txts, links, width=width)
+
 
 
 class Visualizer():
@@ -255,20 +296,20 @@ class Visualizer():
                 for label, image in visuals.items():
 #                     print('label : ', label)
                     if 'B' in label:
-                        image_numpy = util.tensor2im(image, color_map=True)  
-#                         print(image_numpy.shape)
-                        
-                        image_numpy = np.repeat(image_numpy,29,axis=0) 
-#                         print(image_numpy.shape)
-#                         pass
+                        image_numpy = util.tensor2im(image, color_map=True)    
                     else:    
-                        image_numpy = util.tensor2im(image)
-#                         print("A ",image_numpy.shape)
-            
-                        
-                        
+                        # print("label, image shape: ", label, image[:,0,:,:].shape)
+                        image_numpy = util.tensor2im(image[:,0,:,:].unsqueeze(1))
+                        image_numpy_sparse = util.tensor2im(image[:,1,:,:].unsqueeze(1), color_map=True)
+                        # print("label, image numpy shape: ", label, image_numpy.shape) (256, 256, 3)
+
+                        # print("label, image numpy sparse shape: ", label, image_numpy_sparse.shape)
+                        # image_numpy = np.concatenate((image_numpy, image_numpy_sparse), axis=0)
                     label_html_row += '<td>%s</td>' % label
                     images.append(image_numpy.transpose([2, 0, 1]))
+                    if 'A' in label:
+                        images.append(image_numpy_sparse.transpose([2, 0, 1]))
+
                     idx += 1
                     if idx % ncols == 0:
                         label_html += '<tr>%s</tr>' % label_html_row
@@ -296,10 +337,7 @@ class Visualizer():
 #                         print('label :', label)
                         
                         if 'B' in label:
-#                             pass
                             image_numpy = util.tensor2im(image, color_map=True)    
-                            image_numpy = np.repeat(image_numpy,29,axis=0) 
-
                         else:    
                             image_numpy = util.tensor2im(image)
 #                         image_numpy = util.tensor2im(image)
@@ -316,10 +354,7 @@ class Visualizer():
 #                 print('label :', label)
                 
                 if 'B' in label:
-#                     pass
-                    image_numpy = util.tensor2im(image, color_map=True)   
-                    image_numpy = np.repeat(image_numpy,29,axis=0) 
-
+                    image_numpy = util.tensor2im(image, color_map=True)    
                 else:    
                     image_numpy = util.tensor2im(image)
 #                 image_numpy = util.tensor2im(image)
@@ -336,9 +371,7 @@ class Visualizer():
 #                     print('label :', label)
                     
                     if 'B' in label:
-#                         pass
-                        image_numpy = util.tensor2im(image, color_map=True)  
-                        image_numpy = np.repeat(image_numpy,29,axis=0) 
+                        image_numpy = util.tensor2im(image, color_map=True)    
                     else:    
                         image_numpy = util.tensor2im(image)
 #                     image_numpy = util.tensor2im(image)
@@ -348,84 +381,6 @@ class Visualizer():
                     links.append(img_path)
                 webpage.add_images(ims, txts, links, width=self.win_size)
             webpage.save()
-
-    def plot_current_results(self, visuals, batch_size, save_result):
-        """Plot current results on visdom; save current results to an HTML file.
-
-        Parameters:
-            visuals (OrderedDict) - - dictionary of images to display or save
-            batch_size (int) - - the batch size
-            save_result (bool) - - if save the current results to an HTML file
-        """
-        if not hasattr(self, 'plot_result'):
-            # self.plot_result = {'Y': [], 'legend': []}
-            self.plot_result = {'real_B': [],'fake_B': [],'fake_B_show': [], 'legend': [], 'X':[]}
-
-        # self.plot_result['X'].append(np.arange(256))
-        
-        for label, image in visuals.items():
-            if "B" in label:
-                # self.plot_result['Y'].append(image.squeeze(1).squeeze(1))
-                self.plot_result[label].append((image.squeeze(1).squeeze(1)+1.)/2.*(depth_max-depth_min)+depth_min)
-                self.plot_result['X'].append(np.arange(256))
-                # self.plot_result[label].append(np.arange(256))
-
-                # print("image size: ", image.shape)
-                self.plot_result['legend'].append(label)
-        try:
-            # print("list X size: ", len(self.plot_result['X']))
-            # print("X 0 size: ", self.plot_result['X'][0].shape)
-
-            # print("list Y size: ", len(self.plot_result['Y']))
-            # print("Y 0 size: ", self.plot_result['Y'][0].shape) # (4,256)
-            # batch_size = self.plot_result['Y'][0].shape[0]
-            batch_size = self.plot_result['real_B'][:][0].shape[0]
-            # print(self.plot_result['legend'])
-            print("type   ", type(self.plot_result['real_B']))
-            print(" len() ", len(self.plot_result['real_B']))
-            print(" array shape", np.array(self.plot_result['real_B']).shape)
-
-            
-            for i in range(batch_size):
-                print("i, ", i)
-            # print("X plot shape ", self.plot_result['X'][0].shape)
-                print("X stack plot shape ", np.array(self.plot_result['X']).reshape(-1, 3).shape)
-                # TO DO : list to array
-                print("Y plot shape ", np.array((np.array(self.plot_result['real_B']).cpu().float().numpy(), np.array(self.plot_result['fake_B']).cpu().float().detach().numpy(), np.array(self.plot_result['fake_B_show']).cpu().float().detach().numpy())).reshape(-1,3).shape)
-                self.vis.line(
-                # X=np.stack(np.arange(256),
-                    # X=np.array(self.plot_result['X']).reshape(-1, len(self.plot_result['legend'])),
-                    # Y=np.array((self.plot_result['real_B'][:][0][0].cpu().float().numpy(), self.plot_result['fake_B'][:][0][0].cpu().float().detach().numpy(), self.plot_result['fake_B_show'][:][0][0].cpu().float().detach().numpy())).reshape(-1,len(self.plot_result['legend'])),
-                    X=np.array(self.plot_result['X']).reshape(-1, 3),
-                    Y=np.array((self.plot_result['real_B'][:][0][0].cpu().float().numpy(), self.plot_result['fake_B'][:][0][0].cpu().float().detach().numpy(), self.plot_result['fake_B_show'][:][0][0].cpu().float().detach().numpy())).reshape(-1,3),
-                   
-                    opts={
-                        'title': self.name + ' depth over space',
-                        'legend': self.plot_result['legend'],
-                        'xlabel': 'space (pixel)',
-                        'ylabel': 'depth (m)'},
-                    win=self.display_id+(i+1)*20+1)
-            # self.vis.line(
-            #     X=np.arange(256),
-            #     Y=np.array(self.plot_result['fake_B'][:][0][0].cpu().float().detach().numpy()),
-            #     opts={
-            #         'title': self.name + ' depth over space fake_B',
-            #         'legend': self.plot_result['legend'],
-            #         'xlabel': 'space',
-            #         'ylabel': 'depth'},
-            #     win=self.display_id+(0+1)*20+1)
-            # self.vis.line(
-            #     X=np.arange(256),
-            #     Y=np.array(self.plot_result['fake_B_show'][:][0][0].cpu().float().detach().numpy()),
-            #     opts={
-            #         'title': self.name + ' depth over space fake_B_show',
-            #         'legend': self.plot_result['legend'],
-            #         'xlabel': 'space',
-            #         'ylabel': 'depth'},
-            #     win=self.display_id+(0+1)*20+1)
-        except VisdomExceptionBase:
-            self.create_visdom_connections()
-        # pass
 
     def plot_current_losses(self, epoch, counter_ratio, losses):
         """display the current losses on visdom display: dictionary of error labels and values

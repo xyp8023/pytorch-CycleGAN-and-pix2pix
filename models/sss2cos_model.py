@@ -5,14 +5,7 @@ from . import networks
 from torch.autograd import Variable
 from torch.autograd import grad as Grad
 
-# EPS = 1e-12
-# depth_max = -9.64964580535888671875 + EPS
-# depth_min = -21.6056976318359375 - EPS
-EPS = 1e-6
-depth_max = -9.636662 + EPS
-depth_min = -21.605515 - EPS
-# depth_max = -32.58413 + EPS
-# depth_min = -100.83445 + EPS
+
 import torch
 
 
@@ -22,14 +15,17 @@ class MaskedL1Loss(torch.nn.Module):
         super(MaskedL1Loss, self).__init__()
 
     def forward(self, pred, target):
+        # print("predi, ", pred.dim(), "target, ", target.dim())
         assert pred.dim() == target.dim(), "inconsistent dimensions"
-        valid_mask = (target<1.0).detach()
+        # valid_mask = (target>-1.0).detach()
+        valid_mask = (target<=0.0).detach()
+
         diff = target - pred
         diff = diff[valid_mask]
         self.loss = diff.abs().mean()
         return self.loss
 
-class Sss2DepthModel(BaseModel):
+class Sss2CosModel(BaseModel):
     """ This class implements the sss2depth model, for learning a mapping from input images to output images given paired data.
 
     The model training requires '--dataset_mode aligned' dataset.
@@ -77,7 +73,7 @@ class Sss2DepthModel(BaseModel):
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
 #         self.visual_names = ['real_A', 'fake_B', 'real_B', 'mask']
         self.visual_names = ['real_A', 'real_B', 'fake_B_show', 'fake_B']
-        
+        self.visual_names_test = ['real_A', 'real_B', 'fake_B_show', 'fake_B', 'real_slant', 'real_depth'] # real_A: SSS, real_B: cos
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>
 
         self.model_names = ['G']
@@ -88,7 +84,8 @@ class Sss2DepthModel(BaseModel):
 
         if self.isTrain:
             # define loss functions
-            self.criterionL1 = torch.nn.L1Loss()
+            # self.criterionL1 = torch.nn.L1Loss()
+            self.criterionL1 =  MaskedL1Loss().cuda()
             self.criterionTV = networks.TVLoss(self.opt.lambda_TV)
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
             self.optimizer_G = torch.optim.Adam(self.netG.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
@@ -107,17 +104,25 @@ class Sss2DepthModel(BaseModel):
         The option 'direction' can be used to swap images in domain A and domain B.
         """
         AtoB = self.opt.direction == 'AtoB'
-        self.real_A = input['A' if AtoB else 'B'].to(self.device)
-        self.real_B = input['B' if AtoB else 'A'].to(self.device)
+        self.real_A = input['A' if AtoB else 'B'].to(self.device) # sss
+        self.real_B = input['B' if AtoB else 'A'].to(self.device) # cos
         self.image_paths = input['A_paths' if AtoB else 'B_paths']
-        self.mask = (self.real_B<1.0) # type bool
+        self.mask = (self.real_B>-1.0) # type bool
+        self.real_slant = input['slant'].to(self.device)
+        self.real_depth = input['depth'].to(self.device)
+        
+        # print("real_A shape: ", self.real_A.shape)
+        # print("real_B shape: ", self.real_B.shape)
+        # print("real_mask shape: ", self.mask.shape)
+        # print("real_slant shape: ", self.real_slant.shape)
+        # print("real_depth shape: ", self.real_depth.shape)
         
     def forward(self):
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
 
         self.fake_B = self.netG(self.real_A) 
         self.fake_B_show = self.fake_B * (self.mask.float())
-        self.fake_B_show[~self.mask]=1.0
+        self.fake_B_show[~self.mask]=-1.0
 
 
 
@@ -131,7 +136,7 @@ class Sss2DepthModel(BaseModel):
         self.fake_B =self.netG.module.forward_pnp_rear(self.pnp_z) 
         # self.sparse_mask = (self.sparse_target<1.0)
         self.fake_B_show = self.fake_B * (self.mask.float())
-        self.fake_B_show[~self.mask]=1.0
+        self.fake_B_show[~self.mask]=-1.0
 
     def backward_G(self):
         """Calculate TV and L1 loss for the generator"""
@@ -139,7 +144,11 @@ class Sss2DepthModel(BaseModel):
         # Second, G(A) = B
 #         self.loss_CNT = self.mask.size()[0]*self.mask.size()[2]*self.mask.size()[3]/torch.sum(self.mask.float())
         
-        self.loss_G_L1 = self.criterionL1(self.fake_B_show, self.real_B) / 2.0 *(depth_max-depth_min)
+        self.loss_G_L1 = self.criterionL1( -(self.fake_B_show+1.0)/2.0 * self.real_slant, self.real_depth) 
+        # self.loss_G_L1 = self.criterionL1( self.fake_B_show, self.real_B) 
+
+        # self.loss_G_L1 = self.criterionL1(self.fake_B_show , self.real_B) 
+
 #         self.loss_G_L1_show = self.criterionL1(self.fake_B_show , self.real_B) * 2.0 *(depth_max-depth_min) * self.loss_CNT
         
         self.loss_TV = self.criterionTV(self.fake_B) 
@@ -157,6 +166,7 @@ class Sss2DepthModel(BaseModel):
         # self.forward_pnp_front()    
         # self.forward_pnp_rear()               # compute fake images: G(A)
         self.sparse_target = self.real_A[:,-1:] # NOTE: written for rgbd input
+        # self.sparse_target = self.real_depth
         # criterion = criteria.MaskedL1Loss().cuda() # NOTE: criterion function defined here only for clarity
         # pnp_iters = 10 # number of iterations
         pnp_alpha = 0.01 # update/learning rate
@@ -174,7 +184,9 @@ class Sss2DepthModel(BaseModel):
             if pnp_i < self.pnp_iters - 1:
                 # if pnp_i==0:
                     # print("pnp iteration: ", pnp_i)
-                self.loss_G_L1 = self.criterionMaskedL1(self.fake_B, self.sparse_target) / 2.0 *(depth_max-depth_min)
+                self.loss_G_L1 = self.criterionMaskedL1(self.fake_B, self.sparse_target ) 
+                
+                # self.loss_G_L1 = self.criterionMaskedL1( -(self.fake_B+1.0)/2.0*self.real_slant, -(self.sparse_target+1.0)/2.0*self.real_slant ) 
                 # self.loss_TV = self.criterionTV(self.fake_B)
                 # self.loss_G = self.loss_TV + self.loss_G_L1
                 pnp_z_grad = Grad([self.loss_G_L1], [self.pnp_z], create_graph=True)[0]
