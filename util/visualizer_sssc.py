@@ -101,7 +101,9 @@ def save_images(webpage, visuals, image_path, aspect_ratio=1.0, width=256):
             
         else:
             # im = util.tensor2im(im_data)
-            im = util.tensor2im(im_data[:,0,:,:].unsqueeze(1))
+#             im = util.tensor2im(im_data[:,0,:,:].unsqueeze(1))
+            im = util.tensor2im_raw_sss(im_data[:,0,:,:].unsqueeze(1))
+            
             im_numpy_sparse = util.tensor2im(im_data[:,1,:,:].unsqueeze(1), color_map=True)
         
         util.save_image(im, save_path, aspect_ratio=aspect_ratio)
