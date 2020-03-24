@@ -558,6 +558,7 @@ class ResnetBlock(nn.Module):
         Original Resnet paper: https://arxiv.org/pdf/1512.03385.pdf
         """
         super(ResnetBlock, self).__init__()
+        self.alpha_i = nn.Parameter(torch.zeros(1))
         self.conv_block = self.build_conv_block(dim, padding_type, norm_layer, use_dropout, use_bias)
 
     def build_conv_block(self, dim, padding_type, norm_layer, use_dropout, use_bias):
@@ -602,7 +603,8 @@ class ResnetBlock(nn.Module):
 
     def forward(self, x):
         """Forward function (with skip connections)"""
-        out = x + self.conv_block(x)  # add skip connections
+        out = x + self.alpha_i * self.conv_block(x)  # add skip connections
+#         print(self.alpha_i)
         return out
 
 
