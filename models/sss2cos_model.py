@@ -18,7 +18,7 @@ class MaskedL1Loss(torch.nn.Module):
         # print("predi, ", pred.dim(), "target, ", target.dim())
         assert pred.dim() == target.dim(), "inconsistent dimensions"
         # valid_mask = (target>-1.0).detach()
-        valid_mask = (target<=0.0).detach()
+        valid_mask = (target<0.0).detach()
 
         diff = target - pred
         diff = diff[valid_mask]
