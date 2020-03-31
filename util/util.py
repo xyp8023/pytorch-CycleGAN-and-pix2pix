@@ -61,7 +61,7 @@ def tensor2im_raw_sss(input_image, imtype=np.float64):
             return input_image
         image_numpy = image_tensor[0].cpu().float().numpy()  # convert it into a numpy array
         # print(image_numpy.shape)
-        image_numpy = np.transpose(image_numpy, (1, 2, 0)) 
+        image_numpy = np.transpose(image_numpy, (1, 2, 0)) * 255.0
         
     return image_numpy.astype(imtype)
 def tensor2im(input_image, imtype=np.uint8, keep_grayscale=False, color_map=False):

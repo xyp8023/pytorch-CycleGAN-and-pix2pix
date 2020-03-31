@@ -4,7 +4,7 @@ from . import networks
 
 from torch.autograd import Variable
 from torch.autograd import grad as Grad
-
+import numpy as np
 
 import torch
 
@@ -18,8 +18,8 @@ class MaskedL1Loss(torch.nn.Module):
         # print("predi, ", pred.dim(), "target, ", target.dim())
         assert pred.dim() == target.dim(), "inconsistent dimensions"
         # valid_mask = (target>-1.0).detach()
-        valid_mask = (target<0.0).detach()
-
+        valid_mask = (target!=0.0).detach()
+        
         diff = target - pred
         diff = diff[valid_mask]
         self.loss = diff.abs().mean()
@@ -110,7 +110,8 @@ class Sss2CosModel(BaseModel):
         self.mask = (self.real_B>-1.0) # type bool
         self.real_slant = input['slant'].to(self.device)
         self.real_depth = input['depth'].to(self.device)
-        
+#         slant = torch.from_numpy((np.arange(256)*170.0/256).reshape(1,1,256)).float().to(self.device)
+#         torch.from_numpy(slant_).float().to(device)
         # print("real_A shape: ", self.real_A.shape)
         # print("real_B shape: ", self.real_B.shape)
         # print("real_mask shape: ", self.mask.shape)
@@ -143,8 +144,10 @@ class Sss2CosModel(BaseModel):
 
         # Second, G(A) = B
 #         self.loss_CNT = self.mask.size()[0]*self.mask.size()[2]*self.mask.size()[3]/torch.sum(self.mask.float())
+        slant = torch.from_numpy((np.arange(256)*169.0/256).reshape(1,1,256)).float().to(self.device)
+#         self.loss_G_L1 = self.criterionL1( -(self.fake_B_show+1.0)/2.0 * slant, self.real_depth) 
+        self.loss_G_L1 = self.criterionL1( (self.fake_B_show+1) *slant, (self.real_B+1)*slant) 
         
-        self.loss_G_L1 = self.criterionL1( -(self.fake_B_show+1.0)/2.0 * self.real_slant, self.real_depth) 
         # self.loss_G_L1 = self.criterionL1( self.fake_B_show, self.real_B) 
 
         # self.loss_G_L1 = self.criterionL1(self.fake_B_show , self.real_B) 
