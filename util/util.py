@@ -6,6 +6,29 @@ from PIL import Image
 import os
 from cv2 import applyColorMap, COLORMAP_JET 
 
+def dcp_norm(I, vis=False, flag="stbd", pair=0):
+    if pair==1:
+        a,b,c,d = 210.5, -0.006692, 57.32, -0.001335 # left pair left
+    elif pair==0: 
+        a,b,c,d = 229.4, -0.005883, 81.63, -0.001001 # left overall
+    elif pair==2:
+        a,b,c,d = 248.3, -0.005074, 105.9, -0.0006677 # left pair right
+        
+    h,w = I.shape
+    if flag == "port":
+        z = np.arange(w-1,-1,-1).reshape(1,-1)
+    elif flag == "stbd":
+        z = np.arange(w).reshape(1,-1)
+    elif flag=="whole":
+        z1 = np.arange(w//2-1,-1,-1).reshape(1,-1)
+        z2 = np.arange(w//2).reshape(1,-1)
+        z = np.hstack((z1,z2))
+    else:
+        print("wrong flag!")
+        return
+    f = 1 / (a * np.exp(b*z) + c * np.exp(d*z))
+    f = np.repeat(f,h,axis=0)
+    return I*f
 
 def multi_tensor2im(input_image, imtype=np.float64):
     """"Converts a 4D Tensor array into a numpy array. For cal scores
@@ -61,6 +84,7 @@ def tensor2im_raw_sss(input_image, imtype=np.float64):
             return input_image
         image_numpy = image_tensor[0].cpu().float().numpy()  # convert it into a numpy array
         # print(image_numpy.shape)
+        image_numpy = np.tile(image_numpy, (3, 1, 1))
         image_numpy = np.transpose(image_numpy, (1, 2, 0)) * 255.0
         
     return image_numpy.astype(imtype)

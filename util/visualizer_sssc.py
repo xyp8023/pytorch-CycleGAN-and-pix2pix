@@ -64,6 +64,7 @@ def cal_scores(visuals):
 #     print('im_real_B:')    
 #     util.print_numpy(im_real_B, val=True, shp=True)
     mask = (im_real_B>0.)
+#     print("\n\nmax min: ", im_real_B.max(), im_real_B.min(), im_fake_B.max(), im_fake_B.min())
     depth_ori = im_real_B/255.
     depth_pre = im_fake_B/255.
     
@@ -156,13 +157,21 @@ def cal_scores_test(visuals):
 #     util.print_numpy(im_real_B, val=True, shp=True)
     mask = (im_real_B>0.)  # valid mask
     mask_depth = depth_ori!=0. # valid mask 
-
+#     print("\n\nmax min im_real_B: ", im_real_B.shape, im_real_B.max(), im_real_B.min(), im_fake_B.max(), im_fake_B.min())
+#     print("\n\nmax min: im_slant ", im_slant.max(), im_slant.min(), depth_ori.max(), depth_ori.min())
+    
     cos_ori = im_real_B/255. # (0,1)
     cos_pre = (im_fake_B/255.).reshape((256,256))
-    # print("im_slant shape: ", im_slant.shape)
-    # print("cos_pre shape: ", cos_pre.shape)
+#     print("im_slant shape: ", im_slant.shape)
+#     print("cos_pre shape: ", cos_pre.shape)
+#     print("cos_ori shape: ", cos_ori.shape)
+#     print("mask_depth shape: ", mask_depth.shape)
+    
     # print("depth_ori shape: ", depth_ori.shape)
-
+#     depth_ori_ = -cos_ori.reshape(256,256)*im_slant
+#     depth_ori_[~mask_depth]=0.
+#     print("\n dif should be 0: ",np.abs(depth_ori_-depth_ori).max())
+    
     depth_pre = -cos_pre*im_slant # positive to negativate 
     depth_pre[~mask_depth]=0.
     # depth_ori
@@ -198,12 +207,23 @@ def save_images_test(webpage, visuals, image_path, aspect_ratio=1.0, width=256):
             im = util.tensor2im(im_data, color_map=True)
 #             util.save_image(im, save_path, aspect_ratio=aspect_ratio, color_map=True)
             
+            util.save_image(im, save_path, aspect_ratio=aspect_ratio)
         elif 'A' in label:
             # im = util.tensor2im(im_data)
-            im = util.tensor2im(im_data[:,0,:,:].unsqueeze(1))
+            im = util.tensor2im_raw_sss(im_data[:,0,:,:].unsqueeze(1)) # (256,256,3) # np.float64 *255.
+#             print(im.shape, im.max(), im.min())
+            
+            im = util.dcp_norm(im[:,:,0], pair=0)
+#             print(im.shape, im.max(), im.min())
+            
+            im = np.tile(im.reshape(256,256,1), (1, 1, 3))
+#             print(im.shape, im.max(), im.min())
+            im = (im-im.min())/(im.max()-im.min())*255.
+            im = im.astype(np.uint8)
+#             print(im.shape, im.max(), im.min())
             im_numpy_sparse = util.tensor2im(im_data[:,1,:,:].unsqueeze(1), color_map=True)
-        
-        util.save_image(im, save_path, aspect_ratio=aspect_ratio)
+      
+            util.save_image(im, save_path, aspect_ratio=aspect_ratio)
         if 'A' in label:
             util.save_image(im_numpy_sparse, os.path.join(image_dir, 'sparse_'+image_name), aspect_ratio=aspect_ratio)
         ims.append(image_name)
@@ -218,6 +238,60 @@ def save_images_test(webpage, visuals, image_path, aspect_ratio=1.0, width=256):
 
     webpage.add_images(ims, txts, links, width=width)
 
+def save_arrays_test(webpage, visuals, image_path):
+    """Save numpy arrays to the disk.
+
+    Parameters:
+        webpage (the HTML class) -- the HTML webpage class that stores these imaegs (see html.py for more details)
+        visuals (OrderedDict)    -- an ordered dictionary that stores (name, images (either tensor or numpy) ) pairs
+        image_path (str)         -- the string is used to create image paths
+
+
+    This function will save images stored in 'visuals' to the HTML file specified by 'webpage'.
+    """
+    image_dir = webpage.get_image_dir()
+    short_path = ntpath.basename(image_path[0])
+    name = os.path.splitext(short_path)[0]
+
+    webpage.add_header(name)
+    ims, txts, links = [], [], []
+
+    for label, im_data in visuals.items():
+        image_name = '%s_%s.npy' % (name, label)
+        save_path = os.path.join(image_dir, image_name)
+        if 'B' in label:
+            im = (util.tensor2im_raw(im_data) + 1.)/2. # from (-1,1) to (0,1)
+            im = np.transpose(im, (1, 2, 0)).reshape((256,256)) 
+#             im = im.astype(np.uint8)
+#             print(im.shape, im.max(), im.min())
+#             util.save_image(im, save_path, aspect_ratio=aspect_ratio, color_map=True)
+            util.save_numpy_array(im, save_path)
+
+            
+        if 'A' in label:
+            # im = util.tensor2im(im_data)
+            im = util.tensor2im_raw(im_data[:,0,:,:].unsqueeze(1)) # (256,256,3) # np.float64
+            im = np.transpose(im, (1, 2, 0)).reshape((256,256)) 
+#             im = im.astype(np.uint8)
+#             print(im.shape, im.max(), im.min())
+#             im_numpy_sparse = util.tensor2im(im_data[:,1,:,:].unsqueeze(1), color_map=True)
+            util.save_numpy_array(im, save_path)
+
+#         util.save_numpy_array(im, save_path)
+        
+#         if 'A' in label:
+#             util.save_numpy_array(im_numpy_sparse, os.path.join(image_dir, 'sparse_'+image_name), aspect_ratio=aspect_ratio)
+#         ims.append(image_name)
+#         if 'A' in label:
+#             ims.append('sparse_'+image_name)
+#         txts.append(label)
+#         if 'A' in label:
+#             txts.append('sparse_'+label)
+#         links.append(image_name)
+#         if 'A' in label:
+#             links.append('sparse_'+image_name)
+
+#     webpage.add_images(ims, txts, links, width=width)
 
 
 class Visualizer():
@@ -301,7 +375,7 @@ class Visualizer():
                         image_numpy = util.tensor2im(image, color_map=True)    
                     else:    
                         # print("label, image shape: ", label, image[:,0,:,:].shape)
-                        image_numpy = util.tensor2im(image[:,0,:,:].unsqueeze(1))
+                        image_numpy = util.tensor2im_raw_sss(image[:,0,:,:].unsqueeze(1))
                         image_numpy_sparse = util.tensor2im(image[:,1,:,:].unsqueeze(1), color_map=True)
                         # print("label, image numpy shape: ", label, image_numpy.shape) (256, 256, 3)
 

@@ -30,7 +30,7 @@ import os
 from options.test_options import TestOptions
 from data import create_dataset
 from models import create_model
-from util.visualizer_sssc import save_images_test, cal_scores_test
+from util.visualizer_sssc import save_images_test, cal_scores_test, save_arrays_test
 from util import html
 import time
 
@@ -79,6 +79,8 @@ if __name__ == '__main__':
 #         if i % 5 == 0:  # save images to an HTML file
         print('processing (%04d)-th image... %s' % (i, img_path))
         save_images_test(webpage, visuals, img_path, aspect_ratio=opt.aspect_ratio, width=opt.display_winsize)
+        save_arrays_test(webpage, visuals, img_path)
+        
         (abs_rel_, sq_rel_, rmse_, rmse_log10_, mae_, mae_log10_, a1_, a2_, a3_) = cal_scores_test(visuals)
     
         abs_rel += abs_rel_
