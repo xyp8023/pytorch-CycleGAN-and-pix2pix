@@ -143,6 +143,11 @@ def cal_scores_test(visuals):
         
         if "fake_B" == label:
             im_fake_B = util.tensor2im(im_data, imtype=np.float64, keep_grayscale=True)
+        if "fake_B_show" == label:
+#             im_fake_B_show = util.tensor2im(im_data, imtype=np.float64, keep_grayscale=True)
+            im_fake_B_show = (util.tensor2im_raw(im_data) + 1.)/2. # from (-1,1) to (0,1)
+            im_fake_B_show = np.transpose(im_fake_B_show, (1, 2, 0)).reshape((256,256)) 
+            
         if "real_B" == label:
             im_real_B = util.tensor2im(im_data, imtype=np.float64, keep_grayscale=True)
         if "real_slant" == label:
@@ -153,15 +158,20 @@ def cal_scores_test(visuals):
     
 #     print('im_fake_B:')    
 #     util.print_numpy(im_fake_B, val=True, shp=True)# max 255.0 min 0.0
-#     print('im_real_B:')    
+#     print('im_real_B:', im_real_B.shape, im_real_B.max(), im_real_B.min())    
+#     print('im_fake_B:', im_fake_B.shape, im_fake_B.max(), im_fake_B.min())    
+#     print('im_fake_B_show:', im_fake_B_show.shape, im_fake_B_show.max(), im_fake_B_show.min())    
+    depth_pre_ = -(im_fake_B_show*im_slant)
+    
 #     util.print_numpy(im_real_B, val=True, shp=True)
     mask = (im_real_B>0.)  # valid mask
     mask_depth = depth_ori!=0. # valid mask 
 #     print("\n\nmax min im_real_B: ", im_real_B.shape, im_real_B.max(), im_real_B.min(), im_fake_B.max(), im_fake_B.min())
 #     print("\n\nmax min: im_slant ", im_slant.max(), im_slant.min(), depth_ori.max(), depth_ori.min())
     
-    cos_ori = im_real_B/255. # (0,1)
-    cos_pre = (im_fake_B/255.).reshape((256,256))
+#     cos_ori = im_real_B/255. # (0,1)
+#     cos_pre = (im_fake_B/255.).reshape((256,256))
+    
 #     print("im_slant shape: ", im_slant.shape)
 #     print("cos_pre shape: ", cos_pre.shape)
 #     print("cos_ori shape: ", cos_ori.shape)
@@ -172,11 +182,13 @@ def cal_scores_test(visuals):
 #     depth_ori_[~mask_depth]=0.
 #     print("\n dif should be 0: ",np.abs(depth_ori_-depth_ori).max())
     
-    depth_pre = -cos_pre*im_slant # positive to negativate 
-    depth_pre[~mask_depth]=0.
+#     depth_pre = -cos_pre*im_slant # positive to negativate 
+#     depth_pre[~mask_depth]=0.
+    
+#     print("diff: ", np.mean(np.abs(depth_pre_ -depth_pre)))
     # depth_ori
     abs_rel, sq_rel, rmse, rmse_log10, mae, mae_log10, a1, a2, a3 = compute_errors(
-        depth_ori, depth_pre, mask_depth)  # epsilon = 1.05
+        depth_ori, depth_pre_, mask_depth)  # epsilon = 1.05
 #     print("abs_rel, sq_rel, rmse, rmse_log10, mae, mae_log10, a1, a2, a3:\n", abs_rel, sq_rel, rmse, rmse_log10, mae, mae_log10, a1, a2, a3)
 #     print("mae: ", mae)
     return abs_rel, sq_rel, rmse, rmse_log10, mae, mae_log10, a1, a2, a3
