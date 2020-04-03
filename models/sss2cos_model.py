@@ -25,6 +25,21 @@ class MaskedL1Loss(torch.nn.Module):
         self.loss = diff.abs().mean()
         return self.loss
 
+class MaskedL2Loss(torch.nn.Module):
+    def __init__(self):
+        super(MaskedL2Loss, self).__init__()
+
+    def forward(self, pred, target):
+        # print("predi, ", pred.dim(), "target, ", target.dim())
+        assert pred.dim() == target.dim(), "inconsistent dimensions"
+        # valid_mask = (target>-1.0).detach()
+        valid_mask = (target!=0.0).detach()
+        
+        diff = (target - pred)**2
+        diff = diff[valid_mask]
+        self.loss = diff.mean()
+        return self.loss 
+    
 class Sss2CosModel(BaseModel):
     """ This class implements the sss2depth model, for learning a mapping from input images to output images given paired data.
 
@@ -84,8 +99,10 @@ class Sss2CosModel(BaseModel):
 
         if self.isTrain:
             # define loss functions
-            # self.criterionL1 = torch.nn.L1Loss()
-            self.criterionL1 =  MaskedL1Loss().cuda()
+#             self.criterionL1 = torch.nn.L1Loss()
+#             self.criterionL1 =  MaskedL1Loss().cuda()
+            self.criterionL2 =  MaskedL2Loss().cuda()
+            
             self.criterionTV = networks.TVLoss(self.opt.lambda_TV)
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
             self.optimizer_G = torch.optim.Adam(self.netG.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
@@ -146,7 +163,8 @@ class Sss2CosModel(BaseModel):
 #         self.loss_CNT = self.mask.size()[0]*self.mask.size()[2]*self.mask.size()[3]/torch.sum(self.mask.float())
         slant = torch.from_numpy((np.arange(256)*169.0/256).reshape(1,1,256)).float().to(self.device)
 #         self.loss_G_L1 = self.criterionL1( -(self.fake_B_show+1.0)/2.0 * slant, self.real_depth) 
-        self.loss_G_L1 = self.criterionL1( (self.fake_B_show+1) *slant, (self.real_B+1)*slant) 
+#         self.loss_G_L1 = self.criterionL1( (self.fake_B_show+1) *slant, (self.real_B+1)*slant) 
+        self.loss_G_L1 = self.criterionL2( (self.fake_B_show+1) *slant, (self.real_B+1)*slant) 
         
         # self.loss_G_L1 = self.criterionL1( self.fake_B_show, self.real_B) 
 
