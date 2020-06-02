@@ -161,10 +161,14 @@ class Sss2CosModel(BaseModel):
 
         # Second, G(A) = B
 #         self.loss_CNT = self.mask.size()[0]*self.mask.size()[2]*self.mask.size()[3]/torch.sum(self.mask.float())
-        slant = torch.from_numpy((np.arange(256)*169.0/256).reshape(1,1,256)).float().to(self.device)
+        #slant = torch.from_numpy((np.arange(256)*169.0/256).reshape(1,1,256)).float().to(self.device)
+        
 #         self.loss_G_L1 = self.criterionL1( -(self.fake_B_show+1.0)/2.0 * slant, self.real_depth) 
 #         self.loss_G_L1 = self.criterionL1( (self.fake_B_show+1) *slant, (self.real_B+1)*slant) 
-        self.loss_G_L1 = self.criterionL2( (self.fake_B_show+1) *slant, (self.real_B+1)*slant) 
+        #self.loss_G_L1 = self.criterionL2( (self.fake_B_show+1) *slant, (self.real_B+1)*slant) 
+#         self.loss_G_L1 = self.criterionL2( (self.fake_B_show+1) *slant, (self.real_B+1)*slant) 
+        self.loss_G_L1 = self.criterionL1((self.fake_B_show+1) * self.real_slant, (self.real_B+1) * self.real_slant) 
+        
         
         # self.loss_G_L1 = self.criterionL1( self.fake_B_show, self.real_B) 
 
