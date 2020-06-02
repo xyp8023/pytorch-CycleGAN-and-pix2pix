@@ -100,8 +100,9 @@ class Sss2CosModel(BaseModel):
         if self.isTrain:
             # define loss functions
 #             self.criterionL1 = torch.nn.L1Loss()
-#             self.criterionL1 =  MaskedL1Loss().cuda()
-            self.criterionL2 =  MaskedL2Loss().cuda()
+            self.criterionL1 =  MaskedL1Loss().cuda()
+            
+            #self.criterionL2 =  MaskedL2Loss().cuda()
             
             self.criterionTV = networks.TVLoss(self.opt.lambda_TV)
             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
